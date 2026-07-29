@@ -62,7 +62,7 @@ const itemParaLinha = (i) => ({ condominio_id: nuloSeAvulso(i.condId), cliente_a
 
 // Serviços
 const servDeLinha = (r) => ({ id: r.id, condId: r.condominio_id || AVULSO, clienteAvulso: r.cliente_avulso || "", titulo: r.titulo, data: r.data_agendada, valorEstimado: Number(r.valor_estimado || 0), valor: Number(r.valor), executadoEm: r.executado_em || "", status: r.status_nota, nfNumero: r.nf_numero || "", pgtoData: r.pago_em || "" });
-const servParaLinha = (s) => ({ condominio_id: nuloSeAvulso(s.condId), cliente_avulso: s.condId === AVULSO ? (s.clienteAvulso || "Avulso") : null, titulo: s.titulo, data_agendada: s.data, valor_estimado: s.valorEstimado || 0, valor: s.valor || 0, executado_em: s.executadoEm || null, status_nota: s.status, nf_numero: s.nfNumero || null, nf_emitida_em: s.status !== "nao_emitida" ? (s.nfEmitidaEm || hoje()) : null, pago_em: s.pgtoData || null });
+const servParaLinha = (s) => ({ condominio_id: nuloSeAvulso(s.condId), cliente_avulso: s.condId === AVULSO ? (s.clienteAvulso || "Avulso") : null, titulo: s.titulo, data_agendada: s.data, valor_estimado: s.valorEstimado || 0, valor: s.valor || 0, executado_em: s.executadoEm || null, status_nota: s.status, nf_numero: s.nfNumero || null, nf_emitida_em: s.status !== "nao_emitida" ? (s.nfEmitidaEm || s.executadoEm || s.data || hoje()) : null, pago_em: s.status === "paga" ? (s.pgtoData || s.executadoEm || s.data || hoje()) : null });
 
 async function carregarTudo() {
   const [c, i, s] = await Promise.all([
