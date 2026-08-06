@@ -37,6 +37,120 @@ const STATUS_NOTA = {
 // Valor efetivo de um serviço: o real (se concluído/informado), senão o estimado
 const valorEfetivo = (s) => (s.valor > 0 ? s.valor : s.valorEstimado || 0);
 
+// ---------------------------------------------------------------------------
+// Gera o PDF do orçamento: abre uma janela com o documento formatado na
+// identidade oficial da NORUM e chama a impressão (o usuário escolhe
+// "Salvar como PDF"). Não depende de biblioteca externa.
+// ---------------------------------------------------------------------------
+const NORUM_AZUL = "#2C4466";
+function gerarPdfOrcamento(orc, linhas, cliente) {
+  const total = totalOrc(linhas);
+  const venc = addDias(orc.dataEmissao, orc.validadeDias || 15);
+  const num = "ORC-" + String(orc.numero || 0).padStart(4, "0");
+  const linhasHtml = linhas.map((l, i) => `
+    <tr>
+      <td style="padding:9px 8px;border-bottom:1px solid #e6e9ef;color:#8a94a6">${i + 1}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid #e6e9ef">${escapeHtml(l.descricao)}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid #e6e9ef;text-align:center">${l.quantidade}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid #e6e9ef;text-align:right">${brl(l.valorUnitario)}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid #e6e9ef;text-align:right;font-weight:700">${brl((l.quantidade || 0) * (l.valorUnitario || 0))}</td>
+    </tr>`).join("");
+
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>${num} - NORUM Engenharia</title>
+<style>
+  @page { size: A4; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color:#0F0F0F; margin:0; font-size:13px; }
+  .cab { display:flex; align-items:center; gap:16px; border-bottom:3px solid ${NORUM_AZUL}; padding-bottom:14px; }
+  .marca { font-size:26px; font-weight:bold; letter-spacing:3px; color:${NORUM_AZUL}; }
+  .sub { font-size:10px; letter-spacing:2px; color:#6b7688; }
+  .doc { margin-left:auto; text-align:right; }
+  .doc .n { font-size:19px; font-weight:bold; color:${NORUM_AZUL}; }
+  .bloco { margin-top:20px; background:#f5f7fa; border-left:4px solid ${NORUM_AZUL}; padding:12px 14px; }
+  .rot { font-size:10px; letter-spacing:1px; color:#6b7688; text-transform:uppercase; }
+  table { width:100%; border-collapse:collapse; margin-top:20px; }
+  th { background:${NORUM_AZUL}; color:#fff; padding:9px 8px; text-align:left; font-size:11px; letter-spacing:.5px; }
+  .total { margin-top:14px; text-align:right; font-size:17px; font-weight:bold; color:${NORUM_AZUL}; }
+  .obs { margin-top:22px; font-size:12px; white-space:pre-wrap; }
+  .rod { margin-top:34px; border-top:1px solid #e6e9ef; padding-top:12px; font-size:11px; color:#6b7688; text-align:center; }
+  @media print { .noprint { display:none; } }
+</style></head><body>
+  <div class="cab">
+    <svg width="52" height="52" viewBox="0 0 100 100">
+      <polygon points="50,4 91,27 91,73 50,96 9,73 9,27" fill="${NORUM_AZUL}"/>
+      <polygon points="50,13 83,31 83,69 50,87 17,69 17,31" fill="none" stroke="#fff" stroke-width="2.5" opacity="0.6"/>
+      <path d="M36 68 V34 L64 68 V34" fill="none" stroke="#fff" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <div class="marca">NORUM</div>
+      <div class="sub">ENGENHARIA E MANUTENÇÃO PREDIAL</div>
+    </div>
+    <div class="doc">
+      <div class="n">${num}</div>
+      <div style="font-size:11px;color:#6b7688">Emissão: ${fmtData(orc.dataEmissao)}</div>
+      <div style="font-size:11px;color:#6b7688">Válido até: ${fmtData(venc)}</div>
+    </div>
+  </div>
+
+  <div class="bloco">
+    <div class="rot">Cliente</div>
+    <div style="font-size:15px;font-weight:bold;color:${NORUM_AZUL};margin-top:2px">${escapeHtml(cliente.nome || "-")}</div>
+    ${cliente.endereco ? `<div style="font-size:12px;color:#4a5568">${escapeHtml(cliente.endereco)}</div>` : ""}
+    ${cliente.sindico ? `<div style="font-size:12px;color:#4a5568">Responsável: ${escapeHtml(cliente.sindico)}</div>` : ""}
+  </div>
+
+  <div style="margin-top:18px">
+    <div class="rot">Objeto</div>
+    <div style="font-size:15px;font-weight:bold;margin-top:2px">${escapeHtml(orc.titulo)}</div>
+  </div>
+
+  <table>
+    <thead><tr>
+      <th style="width:34px">#</th><th>Descrição dos serviços</th>
+      <th style="width:60px;text-align:center">Qtd.</th>
+      <th style="width:100px;text-align:right">Unitário</th>
+      <th style="width:110px;text-align:right">Total</th>
+    </tr></thead>
+    <tbody>${linhasHtml}</tbody>
+  </table>
+
+  <div class="total">VALOR TOTAL: ${brl(total)}</div>
+
+  ${orc.observacoes ? `<div class="obs"><div class="rot">Observações</div>${escapeHtml(orc.observacoes)}</div>` : ""}
+
+  <div class="rod">
+    NORUM Engenharia · Guarapuava/PR · WhatsApp (42) 98814-7090 · @norum_engenharia<br>
+    Proposta válida por ${orc.validadeDias || 15} dias a contar da data de emissão.
+  </div>
+
+  <div class="noprint" style="text-align:center;margin-top:26px">
+    <button onclick="window.print()" style="background:${NORUM_AZUL};color:#fff;border:none;padding:12px 26px;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer">
+      Salvar como PDF / Imprimir
+    </button>
+  </div>
+</body></html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) { alert("O navegador bloqueou a janela. Libere os pop-ups para este site e tente de novo."); return; }
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => { try { win.print(); } catch (e) {} }, 400);
+}
+function escapeHtml(t) {
+  return String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+const addDias = (iso, d) => { const x = new Date(iso); x.setDate(x.getDate() + d); return x.toISOString().slice(0, 10); };
+
+const STATUS_ORC = {
+  rascunho: { label: "Rascunho", cor: MUTED },
+  enviado:  { label: "Enviado ao cliente", cor: CIANO },
+  aprovado: { label: "Aprovado", cor: VERDE },
+  recusado: { label: "Recusado", cor: VERMELHO },
+};
+// Soma dos itens de um orçamento
+const totalOrc = (itens) => (itens || []).reduce((t, i) => t + (i.quantidade || 0) * (i.valorUnitario || 0), 0);
+
 const uid = () => Math.random().toString(36).slice(2, 10);
 const AVULSO = "__avulso__"; // cliente genérico para serviços fora de condomínio
 const hoje = () => new Date().toISOString().slice(0, 10);
@@ -64,17 +178,28 @@ const itemParaLinha = (i) => ({ condominio_id: nuloSeAvulso(i.condId), cliente_a
 const servDeLinha = (r) => ({ id: r.id, condId: r.condominio_id || AVULSO, clienteAvulso: r.cliente_avulso || "", titulo: r.titulo, data: r.data_agendada, valorEstimado: Number(r.valor_estimado || 0), valor: Number(r.valor), executadoEm: r.executado_em || "", status: r.status_nota, nfNumero: r.nf_numero || "", pgtoData: r.pago_em || "" });
 const servParaLinha = (s) => ({ condominio_id: nuloSeAvulso(s.condId), cliente_avulso: s.condId === AVULSO ? (s.clienteAvulso || "Avulso") : null, titulo: s.titulo, data_agendada: s.data, valor_estimado: s.valorEstimado || 0, valor: s.valor || 0, executado_em: s.executadoEm || null, status_nota: s.status, nf_numero: s.nfNumero || null, nf_emitida_em: s.status !== "nao_emitida" ? (s.nfEmitidaEm || s.executadoEm || s.data || hoje()) : null, pago_em: s.status === "paga" ? (s.pgtoData || s.executadoEm || s.data || hoje()) : null });
 
+// Orçamentos
+const orcDeLinha = (r) => ({ id: r.id, numero: r.numero, condId: r.condominio_id || AVULSO, clienteAvulso: r.cliente_avulso || "", titulo: r.titulo, dataEmissao: r.data_emissao, validadeDias: r.validade_dias, observacoes: r.observacoes || "", status: r.status, servicoId: r.servico_id || "" });
+const orcParaLinha = (o) => ({ condominio_id: nuloSeAvulso(o.condId), cliente_avulso: o.condId === AVULSO ? (o.clienteAvulso || "Avulso") : null, titulo: o.titulo, data_emissao: o.dataEmissao, validade_dias: o.validadeDias || 15, observacoes: o.observacoes || null, status: o.status || "rascunho" });
+const orcItemDeLinha = (r) => ({ id: r.id, orcId: r.orcamento_id, descricao: r.descricao, quantidade: Number(r.quantidade), valorUnitario: Number(r.valor_unitario), ordem: r.ordem });
+
 async function carregarTudo() {
-  const [c, i, s] = await Promise.all([
+  const [c, i, s, o, oi] = await Promise.all([
     supabase.from("condominios").select("*").order("nome"),
     supabase.from("itens_monitorados").select("*"),
     supabase.from("servicos").select("*"),
+    supabase.from("orcamentos").select("*").order("numero", { ascending: false }),
+    supabase.from("orcamento_itens").select("*").order("ordem"),
   ]);
   if (c.error || i.error || s.error) throw (c.error || i.error || s.error);
   return {
     condominios: (c.data || []).map(condDeLinha),
     itens: (i.data || []).map(itemDeLinha),
     servicos: (s.data || []).map(servDeLinha),
+    // orçamentos podem não existir ainda (antes da migração 005) — o app não quebra:
+    // se a tabela não existir, o erro é ignorado e a lista fica vazia
+    orcamentos: o.error ? [] : (o.data || []).map(orcDeLinha),
+    orcItens: oi.error ? [] : (oi.data || []).map(orcItemDeLinha),
   };
 }
 
@@ -107,6 +232,7 @@ const NAV = [
   { k: "extintor", label: "Extintores", icon: "▲" },
   { k: "caixa_dagua", label: "Reservatórios de água", icon: "◆" },
   { k: "caixa_gordura", label: "Caixas de gordura", icon: "▬" },
+  { k: "orcamentos", label: "Orçamentos", icon: "▧" },
   { k: "agenda", label: "Agenda de serviços", icon: "▦" },
   { k: "mensal", label: "Relatório mensal", icon: "▣" },
   { k: "financeiro", label: "Notas fiscais e pagamentos", icon: "▤" },
@@ -212,6 +338,64 @@ export default function App() {
     if (error) return erroAlerta(error);
     await recarregar();
   };
+  // ----- Orçamentos -----
+  const itensDoOrc = (orcId) => (db.orcItens || []).filter((i) => i.orcId === orcId);
+
+  const salvarOrcamento = async (o, linhas) => {
+    let orcId = o.id;
+    if (orcId) {
+      const { error } = await supabase.from("orcamentos").update(orcParaLinha(o)).eq("id", orcId);
+      if (error) return erroAlerta(error);
+    } else {
+      const { data, error } = await supabase.from("orcamentos").insert(orcParaLinha(o)).select("id").single();
+      if (error) return erroAlerta(error);
+      orcId = data.id;
+    }
+    // Regrava as linhas de itens (apaga as antigas e insere as atuais)
+    await supabase.from("orcamento_itens").delete().eq("orcamento_id", orcId);
+    const validas = (linhas || []).filter((l) => l.descricao && l.descricao.trim());
+    if (validas.length) {
+      const { error } = await supabase.from("orcamento_itens").insert(
+        validas.map((l, idx) => ({ orcamento_id: orcId, descricao: l.descricao, quantidade: l.quantidade || 1, valor_unitario: l.valorUnitario || 0, ordem: idx }))
+      );
+      if (error) return erroAlerta(error);
+    }
+    setModal(null); await recarregar();
+  };
+
+  // Aprovar: marca como aprovado e cria o serviço correspondente na agenda
+  const aprovarOrcamento = async (o) => {
+    const total = totalOrc(itensDoOrc(o.id));
+    if (!confirm(`Aprovar o orçamento ORC-${String(o.numero).padStart(4, "0")} e criar o serviço na agenda por ${brl(total)}?`)) return;
+    const { data, error } = await supabase.from("servicos").insert({
+      condominio_id: nuloSeAvulso(o.condId),
+      cliente_avulso: o.condId === AVULSO ? (o.clienteAvulso || "Avulso") : null,
+      titulo: o.titulo,
+      data_agendada: hoje(),
+      valor_estimado: total,
+      valor: 0,
+      status_nota: "nao_emitida",
+    }).select("id").single();
+    if (error) return erroAlerta(error);
+    const { error: e2 } = await supabase.from("orcamentos").update({ status: "aprovado", servico_id: data.id }).eq("id", o.id);
+    if (e2) return erroAlerta(e2);
+    await recarregar();
+    alert("Orçamento aprovado. O serviço foi criado na agenda com a data de hoje — ajuste a data se necessário.");
+  };
+
+  const mudarStatusOrc = async (o, novo) => {
+    const { error } = await supabase.from("orcamentos").update({ status: novo }).eq("id", o.id);
+    if (error) return erroAlerta(error);
+    await recarregar();
+  };
+
+  const excluirOrcamento = async (o) => {
+    if (!confirm("Excluir este orçamento? Os itens também serão removidos.")) return;
+    const { error } = await supabase.from("orcamentos").delete().eq("id", o.id);
+    if (error) return erroAlerta(error);
+    await recarregar();
+  };
+
   const excluir = async (col, id) => {
     if (!confirm("Excluir este registro?")) return;
     const tabela = col === "condominios" ? "condominios" : col === "itens" ? "itens_monitorados" : "servicos";
@@ -332,6 +516,46 @@ export default function App() {
               onEdit={(i) => setModal({ tipo: "item", data: i })}
               onDel={(id) => excluir("itens", id)}
             />
+          )}
+
+          {aba === "orcamentos" && (
+            <div className="fade">
+              <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: 20, color: TITULO }}>Orçamentos</h2>
+                  <div style={{ fontSize: 12.5, color: MUTED }}>Monte a proposta, gere o PDF para o cliente e, se aprovada, converta em serviço</div>
+                </div>
+                <button className="app-btn btn-primary" style={{ marginLeft: "auto" }}
+                  onClick={() => setModal({ tipo: "orcamento", data: { dataEmissao: hoje(), validadeDias: 15, status: "rascunho", condId: db.condominios[0]?.id }, linhas: [] })}>
+                  + Novo orçamento
+                </button>
+              </div>
+              <div className="glass" style={{ overflow: "hidden" }}>
+                <table><thead><tr><th>Nº</th><th>Cliente</th><th>Objeto</th><th>Emissão</th><th>Total</th><th>Status</th><th></th></tr></thead>
+                  <tbody>{(db.orcamentos || []).map((o) => {
+                    const linhas = itensDoOrc(o.id);
+                    return (
+                      <tr key={o.id}>
+                        <td style={{ fontWeight: 800, color: TITULO }}>ORC-{String(o.numero).padStart(4, "0")}</td>
+                        <td>{nomeCliente(o)}</td>
+                        <td>{o.titulo}</td>
+                        <td>{fmtData(o.dataEmissao)}</td>
+                        <td style={{ fontWeight: 700 }}>{brl(totalOrc(linhas))}</td>
+                        <td><Badge cor={STATUS_ORC[o.status].cor}>{STATUS_ORC[o.status].label}</Badge></td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          <button className="app-btn btn-primary" onClick={() => gerarPdfOrcamento(o, linhas, condById(o.condId) || { nome: nomeCliente(o) })}>PDF</button>{" "}
+                          {o.status !== "aprovado" && <><button className="app-btn btn-ghost" onClick={() => aprovarOrcamento(o)}>Aprovar</button>{" "}</>}
+                          {o.status === "rascunho" && <><button className="app-btn btn-ghost" onClick={() => mudarStatusOrc(o, "enviado")}>Marcar enviado</button>{" "}</>}
+                          <button className="app-btn btn-ghost" onClick={() => setModal({ tipo: "orcamento", data: o, linhas })}>Editar</button>{" "}
+                          <button className="app-btn btn-ghost" onClick={() => excluirOrcamento(o)}>×</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {(db.orcamentos || []).length === 0 && <tr><td colSpan={7} style={{ color: MUTED, padding: 22 }}>Nenhum orçamento cadastrado. Utilize o botão “+ Novo orçamento”.</td></tr>}
+                  </tbody></table>
+              </div>
+            </div>
           )}
 
           {aba === "agenda" && (
@@ -462,6 +686,7 @@ export default function App() {
       {modal?.tipo === "cond" && <FormCond data={modal.data} onSave={salvarCond} onClose={() => setModal(null)} />}
       {modal?.tipo === "item" && <FormItem data={modal.data} conds={opcoesCliente} onSave={salvarItem} onClose={() => setModal(null)} />}
       {modal?.tipo === "servico" && <FormServico data={modal.data} conds={opcoesCliente} onSave={salvarServico} onClose={() => setModal(null)} />}
+      {modal?.tipo === "orcamento" && <FormOrcamento data={modal.data} linhasIniciais={modal.linhas} conds={opcoesCliente} onSave={salvarOrcamento} onClose={() => setModal(null)} />}
       {modal?.tipo === "manut" && <FormManut item={modal.data} onConfirmar={confirmarManut} onClose={() => setModal(null)} />}
       {modal?.tipo === "concluir" && <FormConcluir servico={modal.data} onConfirmar={concluirServico} onClose={() => setModal(null)} />}
     </div>
@@ -918,10 +1143,10 @@ function Secao({ titulo, onAdd, children }) {
     </div>
   );
 }
-function Modal({ children, onClose, titulo }) {
+function Modal({ children, onClose, titulo, largura }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(7,27,51,.45)", backdropFilter: "blur(3px)", display: "grid", placeItems: "center", padding: 20, zIndex: 50 }}>
-      <div onClick={(e) => e.stopPropagation()} className="glass fade" style={{ padding: 26, width: 470, maxWidth: "100%", maxHeight: "90vh", overflow: "auto", background: CARD_SOLID }}>
+      <div onClick={(e) => e.stopPropagation()} className="glass fade" style={{ padding: 26, width: largura || 470, maxWidth: "100%", maxHeight: "90vh", overflow: "auto", background: CARD_SOLID }}>
         {titulo && <h3 style={{ marginTop: 0, color: TITULO }}>{titulo}</h3>}{children}
       </div>
     </div>
@@ -998,6 +1223,73 @@ function FormItem({ data, conds, onSave, onClose }) {
       <label>Data da última manutenção</label><input type="date" value={f.ultima} onChange={(e) => setF({ ...f, ultima: e.target.value })} />
       <label>Validade (em branco = cálculo automático: {fmtData(validadeAuto)})</label><input type="date" value={f.validade} onChange={(e) => setF({ ...f, validade: e.target.value })} />
       <Acoes onSave={() => f.local && onSave(f)} onClose={onClose} />
+    </Modal>
+  );
+}
+function FormOrcamento({ data, linhasIniciais, conds, onSave, onClose }) {
+  const [f, setF] = useState({ titulo: "", dataEmissao: hoje(), validadeDias: 15, observacoes: "", status: "rascunho", clienteAvulso: "", condId: conds[0]?.id, ...data });
+  const [linhas, setLinhas] = useState(
+    linhasIniciais && linhasIniciais.length
+      ? linhasIniciais.map((l) => ({ ...l }))
+      : [{ descricao: "", quantidade: 1, valorUnitario: 0 }]
+  );
+  const ehAvulso = f.condId === AVULSO;
+  const total = totalOrc(linhas);
+
+  const mudaLinha = (i, campo, valor) => setLinhas(linhas.map((l, idx) => idx === i ? { ...l, [campo]: valor } : l));
+  const addLinha = () => setLinhas([...linhas, { descricao: "", quantidade: 1, valorUnitario: 0 }]);
+  const removeLinha = (i) => setLinhas(linhas.length > 1 ? linhas.filter((_, idx) => idx !== i) : linhas);
+
+  return (
+    <Modal titulo={data.id ? `Editar orçamento ORC-${String(data.numero).padStart(4, "0")}` : "Novo orçamento"} onClose={onClose} largura={620}>
+      <label>Cliente</label>
+      <select value={f.condId} onChange={(e) => setF({ ...f, condId: e.target.value })}>{conds.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
+      {ehAvulso && (
+        <>
+          <label>Nome do cliente (avulso)</label>
+          <input value={f.clienteAvulso} onChange={(e) => setF({ ...f, clienteAvulso: e.target.value })} placeholder="Ex.: Loja Central" />
+        </>
+      )}
+      <label>Objeto do orçamento</label>
+      <input value={f.titulo} onChange={(e) => setF({ ...f, titulo: e.target.value })} placeholder="Ex.: Manutenção do sistema de combate a incêndio" />
+
+      <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <label>Data de emissão</label>
+          <input type="date" value={f.dataEmissao} onChange={(e) => setF({ ...f, dataEmissao: e.target.value })} />
+        </div>
+        <div style={{ width: 150 }}>
+          <label>Validade (dias)</label>
+          <input type="number" value={f.validadeDias} onChange={(e) => setF({ ...f, validadeDias: parseInt(e.target.value) || 15 })} />
+        </div>
+      </div>
+
+      <label>Itens do orçamento</label>
+      <div style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: 10 }}>
+        <div style={{ display: "flex", gap: 8, fontSize: 11, color: MUTED, fontWeight: 700, marginBottom: 6 }}>
+          <div style={{ flex: 1 }}>DESCRIÇÃO</div>
+          <div style={{ width: 62 }}>QTD.</div>
+          <div style={{ width: 96 }}>UNITÁRIO</div>
+          <div style={{ width: 26 }} />
+        </div>
+        {linhas.map((l, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, marginBottom: 7, alignItems: "center" }}>
+            <input style={{ flex: 1 }} value={l.descricao} onChange={(e) => mudaLinha(i, "descricao", e.target.value)} placeholder="Ex.: Recarga de extintor PQS 6kg" />
+            <input style={{ width: 62 }} type="number" step="0.01" value={l.quantidade} onChange={(e) => mudaLinha(i, "quantidade", parseFloat(e.target.value) || 0)} />
+            <input style={{ width: 96 }} type="number" step="0.01" value={l.valorUnitario} onChange={(e) => mudaLinha(i, "valorUnitario", parseFloat(e.target.value) || 0)} />
+            <button className="app-btn btn-ghost" style={{ width: 26, padding: "6px 0" }} onClick={() => removeLinha(i)}>×</button>
+          </div>
+        ))}
+        <button className="app-btn btn-ghost" style={{ marginTop: 4 }} onClick={addLinha}>+ Adicionar item</button>
+        <div style={{ textAlign: "right", marginTop: 12, fontSize: 17, fontWeight: 800, color: TITULO }}>Total: {brl(total)}</div>
+      </div>
+
+      <label>Observações (aparecem no PDF)</label>
+      <textarea value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} rows={3}
+        placeholder="Ex.: Prazo de execução de 5 dias úteis. Pagamento em até 30 dias."
+        style={{ width: "100%", padding: "10px 12px", border: `1px solid rgba(127,175,232,.20)`, borderRadius: 10, fontSize: 14, background: "rgba(6,22,38,.6)", color: INK, fontFamily: "inherit", resize: "vertical" }} />
+
+      <Acoes onSave={() => f.titulo && onSave(f, linhas)} onClose={onClose} />
     </Modal>
   );
 }
