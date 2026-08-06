@@ -47,95 +47,124 @@ function gerarPdfOrcamento(orc, linhas, cliente) {
   const total = totalOrc(linhas);
   const venc = addDias(orc.dataEmissao, orc.validadeDias || 15);
   const num = "ORC-" + String(orc.numero || 0).padStart(4, "0");
-  const linhasHtml = linhas.map((l, i) => `
+  const linhasHtml = linhas.map((l) => `
     <tr>
-      <td style="padding:9px 8px;border-bottom:1px solid #e6e9ef;color:#8a94a6">${i + 1}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid #e6e9ef">${escapeHtml(l.descricao)}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid #e6e9ef;text-align:center">${l.quantidade}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid #e6e9ef;text-align:right">${brl(l.valorUnitario)}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid #e6e9ef;text-align:right;font-weight:700">${brl((l.quantidade || 0) * (l.valorUnitario || 0))}</td>
+      <td style="padding:10px 10px;border:1px solid #c8d0da">${escapeHtml(l.descricao)}</td>
+      <td style="padding:10px 10px;border:1px solid #c8d0da;text-align:center">${l.quantidade}</td>
+      <td style="padding:10px 10px;border:1px solid #c8d0da;text-align:right">${brl(l.valorUnitario)}</td>
+      <td style="padding:10px 10px;border:1px solid #c8d0da;text-align:right;font-weight:700">${brl((l.quantidade || 0) * (l.valorUnitario || 0))}</td>
     </tr>`).join("");
 
   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
 <title>${num} - NORUM Engenharia</title>
 <style>
-  @page { size: A4; margin: 14mm; }
+  @page { size: A4; margin: 0; }
   * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color:#0F0F0F; margin:0; font-size:13px; }
-  .cab { display:flex; align-items:center; gap:16px; border-bottom:3px solid ${NORUM_AZUL}; padding-bottom:14px; }
-  .marca { font-size:26px; font-weight:bold; letter-spacing:3px; color:${NORUM_AZUL}; }
-  .sub { font-size:10px; letter-spacing:2px; color:#6b7688; }
-  .doc { margin-left:auto; text-align:right; }
-  .doc .n { font-size:19px; font-weight:bold; color:${NORUM_AZUL}; }
-  .bloco { margin-top:20px; background:#f5f7fa; border-left:4px solid ${NORUM_AZUL}; padding:12px 14px; }
-  .rot { font-size:10px; letter-spacing:1px; color:#6b7688; text-transform:uppercase; }
-  table { width:100%; border-collapse:collapse; margin-top:20px; }
-  th { background:${NORUM_AZUL}; color:#fff; padding:9px 8px; text-align:left; font-size:11px; letter-spacing:.5px; }
-  .total { margin-top:14px; text-align:right; font-size:17px; font-weight:bold; color:${NORUM_AZUL}; }
-  .obs { margin-top:22px; font-size:12px; white-space:pre-wrap; }
-  .rod { margin-top:34px; border-top:1px solid #e6e9ef; padding-top:12px; font-size:11px; color:#6b7688; text-align:center; }
-  @media print { .noprint { display:none; } }
+  body { font-family: Arial, Helvetica, sans-serif; color:#0F0F0F; margin:0; font-size:12.5px; }
+  .pag { width:210mm; min-height:297mm; padding:16mm 16mm 0 16mm; margin:auto; position:relative;
+         display:flex; flex-direction:column; background:#fff; }
+  .topo { text-align:center; }
+  .marca { font-size:34px; font-weight:bold; letter-spacing:10px; color:#0F0F0F; margin-top:6px; }
+  .tag { font-size:9.5px; letter-spacing:3px; color:${NORUM_AZUL}; font-weight:bold; margin-top:3px; line-height:1.5; }
+  .faixa { background:${NORUM_AZUL}; color:#fff; padding:8px 14px; margin-top:22px;
+           font-size:13px; font-weight:bold; letter-spacing:2px; display:flex; justify-content:space-between; }
+  .dados { display:flex; gap:26px; margin-top:16px; }
+  .rot { font-size:9px; letter-spacing:1.5px; color:#7a8598; text-transform:uppercase; font-weight:bold; }
+  .val { font-size:13px; margin-top:2px; }
+  table { width:100%; border-collapse:collapse; margin-top:18px; }
+  th { background:${NORUM_AZUL}; color:#fff; padding:9px 10px; text-align:left;
+       font-size:10.5px; letter-spacing:1px; border:1px solid ${NORUM_AZUL}; }
+  .tot td { background:${NORUM_AZUL}; color:#fff; padding:10px; font-size:14px; font-weight:bold; border:1px solid ${NORUM_AZUL}; }
+  .obs { margin-top:18px; font-size:12px; white-space:pre-wrap; line-height:1.5; }
+  .cred { margin-top:auto; padding-top:26px; font-size:10.5px; font-weight:bold; line-height:1.6; }
+  .assin { margin-top:30px; }
+  .assin .rotulo { font-size:9px; letter-spacing:1.5px; color:#7a8598; text-transform:uppercase; font-weight:bold; }
+  .assin .espaco { height:58px; }
+  .assin .linha { border-top:1.2px solid #0F0F0F; width:360px; }
+  .assin .txt { font-style:italic; font-size:12.5px; margin-top:6px; }
+  .assin .campos { display:flex; gap:26px; width:360px; margin-top:14px; font-size:10px; color:#7a8598; }
+  .assin .campos div { flex:1; border-top:1px solid #b9c2cf; padding-top:4px; letter-spacing:1px; }
+  .rodape { margin:26px -16mm 0 -16mm; background:${NORUM_AZUL}; color:#fff;
+            padding:14px 16mm; display:flex; justify-content:space-between; align-items:center; font-size:10.5px; letter-spacing:1px; }
+  .site { text-align:center; font-weight:bold; letter-spacing:2px; }
+  @media print { .noprint { display:none; } .pag { margin:0; } }
 </style></head><body>
-  <div class="cab">
-    <svg width="52" height="52" viewBox="0 0 100 100">
-      <polygon points="50,4 91,27 91,73 50,96 9,73 9,27" fill="${NORUM_AZUL}"/>
-      <polygon points="50,13 83,31 83,69 50,87 17,69 17,31" fill="none" stroke="#fff" stroke-width="2.5" opacity="0.6"/>
-      <path d="M36 68 V34 L64 68 V34" fill="none" stroke="#fff" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
-    </svg>
-    <div>
-      <div class="marca">NORUM</div>
-      <div class="sub">ENGENHARIA E MANUTENÇÃO PREDIAL</div>
+<div class="pag">
+
+  <div class="topo">
+    <svg width="300" viewBox="0 0 1080 696.5" xmlns="http://www.w3.org/2000/svg">${LOGO_COMPLETA}</svg>
+  </div>
+
+  <div class="faixa"><span>ORÇAMENTO ${num}</span><span>${fmtData(orc.dataEmissao)}</span></div>
+
+  <div class="dados">
+    <div style="flex:1">
+      <div class="rot">Cliente</div>
+      <div class="val" style="font-weight:bold">${escapeHtml(cliente.nome || "-")}</div>
+      ${cliente.endereco ? `<div class="val" style="font-size:11.5px;color:#4a5568">${escapeHtml(cliente.endereco)}</div>` : ""}
+      ${cliente.sindico ? `<div class="val" style="font-size:11.5px;color:#4a5568">Responsável: ${escapeHtml(cliente.sindico)}</div>` : ""}
     </div>
-    <div class="doc">
-      <div class="n">${num}</div>
-      <div style="font-size:11px;color:#6b7688">Emissão: ${fmtData(orc.dataEmissao)}</div>
-      <div style="font-size:11px;color:#6b7688">Válido até: ${fmtData(venc)}</div>
+    <div style="width:150px">
+      <div class="rot">Validade da proposta</div>
+      <div class="val">${fmtData(venc)}</div>
     </div>
   </div>
 
-  <div class="bloco">
-    <div class="rot">Cliente</div>
-    <div style="font-size:15px;font-weight:bold;color:${NORUM_AZUL};margin-top:2px">${escapeHtml(cliente.nome || "-")}</div>
-    ${cliente.endereco ? `<div style="font-size:12px;color:#4a5568">${escapeHtml(cliente.endereco)}</div>` : ""}
-    ${cliente.sindico ? `<div style="font-size:12px;color:#4a5568">Responsável: ${escapeHtml(cliente.sindico)}</div>` : ""}
-  </div>
-
-  <div style="margin-top:18px">
+  <div style="margin-top:14px">
     <div class="rot">Objeto</div>
-    <div style="font-size:15px;font-weight:bold;margin-top:2px">${escapeHtml(orc.titulo)}</div>
+    <div class="val" style="font-weight:bold;font-size:14px">${escapeHtml(orc.titulo)}</div>
   </div>
 
   <table>
     <thead><tr>
-      <th style="width:34px">#</th><th>Descrição dos serviços</th>
-      <th style="width:60px;text-align:center">Qtd.</th>
-      <th style="width:100px;text-align:right">Unitário</th>
-      <th style="width:110px;text-align:right">Total</th>
+      <th>DESCRIÇÃO DOS SERVIÇOS</th>
+      <th style="width:62px;text-align:center">QTD.</th>
+      <th style="width:106px;text-align:right">UNITÁRIO</th>
+      <th style="width:116px;text-align:right">TOTAL</th>
     </tr></thead>
-    <tbody>${linhasHtml}</tbody>
+    <tbody>${linhasHtml}
+      <tr class="tot"><td colspan="3" style="text-align:right">VALOR TOTAL</td><td style="text-align:right">${brl(total)}</td></tr>
+    </tbody>
   </table>
-
-  <div class="total">VALOR TOTAL: ${brl(total)}</div>
 
   ${orc.observacoes ? `<div class="obs"><div class="rot">Observações</div>${escapeHtml(orc.observacoes)}</div>` : ""}
 
-  <div class="rod">
-    NORUM Engenharia · Guarapuava/PR · WhatsApp (42) 98814-7090 · @norum_engenharia<br>
-    Proposta válida por ${orc.validadeDias || 15} dias a contar da data de emissão.
+  <div class="cred">
+    Empresa registrada no CREA-PR sob o número 75338<br>
+    Licença ambiental nº de documento 233043, validade 03/05/2031
+    ${orc.dadosContratante ? `<br>${escapeHtml(orc.dadosContratante).replace(/\n/g, "<br>")}` : ""}
   </div>
 
-  <div class="noprint" style="text-align:center;margin-top:26px">
-    <button onclick="window.print()" style="background:${NORUM_AZUL};color:#fff;border:none;padding:12px 26px;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer">
-      Salvar como PDF / Imprimir
-    </button>
+  <div class="assin">
+    <div class="rotulo">Assinatura</div>
+    <div class="espaco"></div>
+    <div class="linha"></div>
+    <div class="txt">Orçamento aceito pelos responsáveis.</div>
+    <div class="campos">
+      <div>NOME LEGÍVEL</div>
+      <div>DATA</div>
+    </div>
   </div>
+
+  <div class="rodape">
+    <span>engenharia@norum.com.br</span>
+    <span class="site">WWW.NORUM.COM.BR</span>
+    <span>(42) 9 98814-7090</span>
+  </div>
+</div>
+
+<div class="noprint" style="text-align:center;margin:22px 0 40px">
+  <button onclick="window.print()" style="background:${NORUM_AZUL};color:#fff;border:none;padding:12px 26px;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer">
+    Salvar como PDF / Imprimir
+  </button>
+</div>
 </body></html>`;
 
   const win = window.open("", "_blank");
   if (!win) { alert("O navegador bloqueou a janela. Libere os pop-ups para este site e tente de novo."); return; }
   win.document.write(html);
   win.document.close();
-  setTimeout(() => { try { win.print(); } catch (e) {} }, 400);
+  setTimeout(() => { try { win.print(); } catch (e) {} }, 500);
 }
 function escapeHtml(t) {
   return String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -179,8 +208,8 @@ const servDeLinha = (r) => ({ id: r.id, condId: r.condominio_id || AVULSO, clien
 const servParaLinha = (s) => ({ condominio_id: nuloSeAvulso(s.condId), cliente_avulso: s.condId === AVULSO ? (s.clienteAvulso || "Avulso") : null, titulo: s.titulo, data_agendada: s.data, valor_estimado: s.valorEstimado || 0, valor: s.valor || 0, executado_em: s.executadoEm || null, status_nota: s.status, nf_numero: s.nfNumero || null, nf_emitida_em: s.status !== "nao_emitida" ? (s.nfEmitidaEm || s.executadoEm || s.data || hoje()) : null, pago_em: s.status === "paga" ? (s.pgtoData || s.executadoEm || s.data || hoje()) : null });
 
 // Orçamentos
-const orcDeLinha = (r) => ({ id: r.id, numero: r.numero, condId: r.condominio_id || AVULSO, clienteAvulso: r.cliente_avulso || "", titulo: r.titulo, dataEmissao: r.data_emissao, validadeDias: r.validade_dias, observacoes: r.observacoes || "", status: r.status, servicoId: r.servico_id || "" });
-const orcParaLinha = (o) => ({ condominio_id: nuloSeAvulso(o.condId), cliente_avulso: o.condId === AVULSO ? (o.clienteAvulso || "Avulso") : null, titulo: o.titulo, data_emissao: o.dataEmissao, validade_dias: o.validadeDias || 15, observacoes: o.observacoes || null, status: o.status || "rascunho" });
+const orcDeLinha = (r) => ({ id: r.id, numero: r.numero, condId: r.condominio_id || AVULSO, clienteAvulso: r.cliente_avulso || "", titulo: r.titulo, dataEmissao: r.data_emissao, validadeDias: r.validade_dias, observacoes: r.observacoes || "", dadosContratante: r.dados_contratante || "", status: r.status, servicoId: r.servico_id || "" });
+const orcParaLinha = (o) => ({ condominio_id: nuloSeAvulso(o.condId), cliente_avulso: o.condId === AVULSO ? (o.clienteAvulso || "Avulso") : null, titulo: o.titulo, data_emissao: o.dataEmissao, validade_dias: o.validadeDias || 15, observacoes: o.observacoes || null, dados_contratante: o.dadosContratante || null, status: o.status || "rascunho" });
 const orcItemDeLinha = (r) => ({ id: r.id, orcId: r.orcamento_id, descricao: r.descricao, quantidade: Number(r.quantidade), valorUnitario: Number(r.valor_unitario), ordem: r.ordem });
 
 async function carregarTudo() {
@@ -217,12 +246,22 @@ function ItemStatus({ validade }) {
   else if (d <= 30) { cor = AMARELO; txt = `Vence em ${d} dias`; }
   return <Badge cor={cor}>{txt}</Badge>;
 }
-function LogoN({ size = 40 }) {
+// ---------------------------------------------------------------------------
+// Logo oficial NORUM — vetor extraído do arquivo original da marca.
+// LOGO_SIMBOLO: octógono com o N (uso em ícone). LOGO_COMPLETA: marca completa
+// com wordmark e assinatura (uso em documentos).
+// ---------------------------------------------------------------------------
+const AZUL_LOGO = "#2A4266";
+const LOGO_SIMBOLO = `<path fill="#2A4266" d="M 611.617188 132.738281 L 611.617188 243.96875 L 583.125 272.019531 L 506.410156 193.113281 L 506.410156 260.265625 L 468.351562 260.265625 L 468.351562 132.738281 L 507.605469 132.738281 L 573.558594 202.878906 L 573.558594 132.738281 Z M 611.617188 132.738281"/><path fill="#2A4266" d="M 624.066406 61.675781 L 456.574219 61.675781 L 448.199219 69.957031 L 390.9375 126.578125 L 382.429688 134.992188 L 382.429688 255.53125 L 390.9375 263.945312 L 447.5625 319.929688 L 455.933594 328.207031 L 623.425781 328.207031 L 631.800781 319.925781 L 689.0625 263.304688 L 697.570312 254.890625 L 697.570312 134.351562 L 689.0625 125.9375 L 632.4375 69.957031 Z M 612.289062 90.335938 L 668.910156 146.316406 L 668.910156 242.925781 L 611.648438 299.546875 L 467.710938 299.546875 L 411.089844 243.566406 L 411.089844 146.957031 L 468.351562 90.335938 Z M 612.289062 90.335938"/>`;
+const LOGO_COMPLETA = `<path fill="#0D0D0D" d="M 218.320312 372.214844 L 218.320312 493.960938 L 188.09375 519.957031 L 106.71875 436.257812 L 106.71875 507.488281 L 66.347656 507.488281 L 66.347656 372.214844 L 107.988281 372.214844 L 177.949219 446.617188 L 177.949219 372.214844 Z M 218.320312 372.214844"/><path fill="#0D0D0D" d="M 363.519531 411.105469 L 316.175781 411.105469 L 304.128906 422.945312 L 304.128906 456.550781 L 316.386719 468.597656 L 363.941406 468.597656 L 375.777344 456.972656 L 375.777344 423.152344 Z M 420.796875 471.558594 L 382.964844 508.96875 L 296.515625 508.96875 L 259.105469 471.980469 L 259.105469 408.148438 L 296.941406 370.738281 L 383.386719 370.738281 L 420.796875 407.722656 Z M 420.796875 471.558594"/><path fill="#0D0D0D" d="M 504.492188 438.160156 L 554.164062 438.160156 L 564.519531 428.015625 L 564.519531 416.816406 L 558.179688 410.894531 L 504.492188 410.894531 Z M 461.585938 507.488281 L 461.585938 372.214844 L 579.316406 372.214844 L 608.695312 401.597656 L 608.695312 437.949219 L 590.941406 455.070312 L 608.484375 472.613281 L 608.484375 507.488281 L 565.363281 507.488281 L 565.363281 487.410156 L 554.164062 476.207031 L 504.492188 476.207031 L 504.492188 507.488281 Z M 461.585938 507.488281"/><path fill="#0D0D0D" d="M 790.035156 372.214844 L 790.035156 507.699219 L 767.84375 507.699219 L 750.722656 490.789062 L 730.644531 508.96875 L 686.257812 508.96875 L 651.59375 474.304688 L 651.59375 372.214844 L 694.921875 372.214844 L 694.921875 458.03125 L 705.492188 468.597656 L 731.066406 468.597656 L 746.707031 454.648438 L 746.707031 372.214844 Z M 790.035156 372.214844"/><path fill="#0D0D0D" d="M 971.167969 507.488281 L 971.167969 435.203125 L 924.035156 485.929688 L 876.898438 435.414062 L 876.898438 507.488281 L 835.261719 507.488281 L 835.261719 387.644531 L 862.105469 362.707031 L 924.246094 426.324219 L 986.808594 362.707031 L 1013.648438 388.070312 L 1013.648438 507.488281 Z M 971.167969 507.488281"/><path fill="#2A4266" d="M 611.617188 132.738281 L 611.617188 243.96875 L 583.125 272.019531 L 506.410156 193.113281 L 506.410156 260.265625 L 468.351562 260.265625 L 468.351562 132.738281 L 507.605469 132.738281 L 573.558594 202.878906 L 573.558594 132.738281 Z M 611.617188 132.738281"/><path fill="#2A4266" d="M 624.066406 61.675781 L 456.574219 61.675781 L 448.199219 69.957031 L 390.9375 126.578125 L 382.429688 134.992188 L 382.429688 255.53125 L 390.9375 263.945312 L 447.5625 319.929688 L 455.933594 328.207031 L 623.425781 328.207031 L 631.800781 319.925781 L 689.0625 263.304688 L 697.570312 254.890625 L 697.570312 134.351562 L 689.0625 125.9375 L 632.4375 69.957031 Z M 612.289062 90.335938 L 668.910156 146.316406 L 668.910156 242.925781 L 611.648438 299.546875 L 467.710938 299.546875 L 411.089844 243.566406 L 411.089844 146.957031 L 468.351562 90.335938 Z M 612.289062 90.335938"/><path fill="#2A4266" d="M 169.132812 555.050781 L 169.132812 559.667969 L 152.347656 559.667969 L 152.347656 566.070312 L 167.644531 566.070312 L 167.644531 570.816406 L 152.347656 570.816406 L 152.347656 577.554688 L 169.296875 577.554688 L 169.296875 582.171875 L 147.714844 582.171875 L 147.714844 555.050781 Z M 169.132812 555.050781"/><path fill="#2A4266" d="M 207.460938 555.050781 L 207.460938 580.859375 L 203.835938 584.121094 L 184.351562 562.210938 L 184.351562 582.171875 L 179.84375 582.171875 L 179.84375 555.050781 L 184.792969 555.050781 L 202.949219 575.648438 L 202.949219 555.050781 Z M 207.460938 555.050781"/><path fill="#2A4266" d="M 243.609375 562.46875 L 240.632812 559.375 L 226.863281 559.375 L 223.320312 563.144531 L 223.320312 573.992188 L 226.984375 577.851562 L 240.027344 577.851562 L 241.921875 575.898438 L 241.921875 571.410156 L 233.546875 571.449219 L 233.546875 567.382812 L 246.550781 567.382812 L 246.550781 582.171875 L 244.214844 582.171875 L 242.445312 579.585938 L 239.90625 582.34375 L 224.730469 582.34375 L 218.449219 575.6875 L 218.449219 561.449219 L 224.691406 554.878906 L 243.007812 554.878906 L 246.871094 558.949219 Z M 243.609375 562.46875"/><path fill="#2A4266" d="M 279.519531 555.050781 L 279.519531 559.667969 L 262.734375 559.667969 L 262.734375 566.070312 L 278.03125 566.070312 L 278.03125 570.816406 L 262.734375 570.816406 L 262.734375 577.554688 L 279.679688 577.554688 L 279.679688 582.171875 L 258.101562 582.171875 L 258.101562 555.050781 Z M 279.519531 555.050781"/><path fill="#2A4266" d="M 317.847656 555.050781 L 317.847656 580.859375 L 314.222656 584.121094 L 294.738281 562.210938 L 294.738281 582.171875 L 290.230469 582.171875 L 290.230469 555.050781 L 295.179688 555.050781 L 313.335938 575.648438 L 313.335938 555.050781 Z M 317.847656 555.050781"/><path fill="#2A4266" d="M 350.976562 582.171875 L 350.976562 570.855469 L 334.191406 570.855469 L 334.191406 582.171875 L 329.519531 582.171875 L 329.519531 555.050781 L 334.191406 555.050781 L 334.191406 566.195312 L 350.976562 566.195312 L 350.976562 555.050781 L 355.648438 555.050781 L 355.648438 582.171875 Z M 350.976562 582.171875"/><path fill="#2A4266" d="M 382.621094 559.457031 L 376.378906 559.457031 L 371.347656 564.667969 L 371.347656 570.222656 L 387.652344 570.222656 L 387.652344 564.710938 Z M 387.652344 582.171875 L 387.652344 574.503906 L 371.347656 574.503906 L 371.347656 582.171875 L 366.71875 582.171875 L 366.71875 562.972656 L 374.285156 554.835938 L 384.753906 554.835938 L 392.320312 562.933594 L 392.320312 582.171875 Z M 387.652344 582.171875"/><path fill="#2A4266" d="M 408.101562 569.246094 L 420.945312 569.246094 L 424.085938 565.984375 L 424.085938 562 L 421.789062 559.625 L 408.101562 559.625 Z M 403.390625 582.171875 L 403.390625 555.050781 L 423.882812 555.050781 L 428.957031 560.433594 L 428.957031 567.296875 L 425.132812 571.28125 L 428.835938 575.136719 L 428.835938 582.171875 L 424.046875 582.171875 L 424.046875 576.875 L 421.023438 573.699219 L 408.101562 573.699219 L 408.101562 582.171875 Z M 403.390625 582.171875"/><path fill="#2A4266" d="M 444.898438 582.171875 L 440.226562 582.171875 L 440.226562 555.050781 L 444.898438 555.050781 Z M 444.898438 582.171875"/><path fill="#2A4266" d="M 471.871094 559.457031 L 465.628906 559.457031 L 460.597656 564.667969 L 460.597656 570.222656 L 476.902344 570.222656 L 476.902344 564.710938 Z M 476.902344 582.171875 L 476.902344 574.503906 L 460.597656 574.503906 L 460.597656 582.171875 L 455.96875 582.171875 L 455.96875 562.972656 L 463.539062 554.835938 L 474.003906 554.835938 L 481.574219 562.933594 L 481.574219 582.171875 Z M 476.902344 582.171875"/><path fill="#2A4266" d="M 531.171875 555.050781 L 534.671875 558.78125 L 531.414062 562.210938 L 528.796875 559.5 L 515.105469 559.5 L 515.105469 566.195312 L 529.761719 566.195312 L 529.761719 570.941406 L 515.105469 570.941406 L 515.105469 577.722656 L 529.035156 577.722656 L 531.613281 575.054688 L 534.832031 578.441406 L 531.292969 582.171875 L 510.515625 582.171875 L 510.515625 555.050781 Z M 531.171875 555.050781"/><path fill="#2A4266" d="M 589.867188 582.171875 L 589.867188 562.339844 L 578.3125 576.113281 L 566.71875 562.382812 L 566.71875 582.171875 L 562.167969 582.171875 L 562.167969 556.875 L 565.308594 553.78125 L 578.351562 569.035156 L 591.355469 553.78125 L 594.535156 556.914062 L 594.535156 582.171875 Z M 589.867188 582.171875"/><path fill="#2A4266" d="M 621.507812 559.457031 L 615.269531 559.457031 L 610.238281 564.667969 L 610.238281 570.222656 L 626.539062 570.222656 L 626.539062 564.710938 Z M 626.539062 582.171875 L 626.539062 574.503906 L 610.238281 574.503906 L 610.238281 582.171875 L 605.605469 582.171875 L 605.605469 562.972656 L 613.175781 554.835938 L 623.640625 554.835938 L 631.210938 562.933594 L 631.210938 582.171875 Z M 626.539062 582.171875"/><path fill="#2A4266" d="M 669.898438 555.050781 L 669.898438 580.859375 L 666.273438 584.121094 L 646.789062 562.210938 L 646.789062 582.171875 L 642.28125 582.171875 L 642.28125 555.050781 L 647.230469 555.050781 L 665.390625 575.648438 L 665.390625 555.050781 Z M 669.898438 555.050781"/><path fill="#2A4266" d="M 707.175781 555.050781 L 707.175781 582.214844 L 704.558594 582.214844 L 702.707031 578.441406 L 698.722656 582.386719 L 687.773438 582.386719 L 681.574219 575.859375 L 681.574219 555.050781 L 686.242188 555.050781 L 686.242188 573.949219 L 689.824219 577.808594 L 698.359375 577.808594 L 702.507812 573.699219 L 702.507812 555.050781 Z M 707.175781 555.050781"/><path fill="#2A4266" d="M 727.546875 582.171875 L 727.546875 559.625 L 720.945312 559.625 L 718.085938 562.636719 L 714.703125 559.074219 L 718.527344 555.050781 L 741.273438 555.050781 L 745.097656 559.074219 L 741.675781 562.636719 L 738.820312 559.625 L 732.214844 559.625 L 732.214844 582.171875 Z M 727.546875 582.171875"/><path fill="#2A4266" d="M 774.042969 555.050781 L 774.042969 559.667969 L 757.257812 559.667969 L 757.257812 566.070312 L 772.554688 566.070312 L 772.554688 570.816406 L 757.257812 570.816406 L 757.257812 577.554688 L 774.203125 577.554688 L 774.203125 582.171875 L 752.628906 582.171875 L 752.628906 555.050781 Z M 774.042969 555.050781"/><path fill="#2A4266" d="M 812.371094 555.050781 L 812.371094 580.859375 L 808.746094 584.121094 L 789.261719 562.210938 L 789.261719 582.171875 L 784.753906 582.171875 L 784.753906 555.050781 L 789.703125 555.050781 L 807.859375 575.648438 L 807.859375 555.050781 Z M 812.371094 555.050781"/><path fill="#2A4266" d="M 837.691406 592.300781 L 835.074219 589.503906 L 837.652344 586.878906 L 836.039062 585.179688 L 836.039062 582.34375 L 829.761719 582.34375 L 823.359375 575.5625 L 823.359375 561.660156 L 829.761719 554.878906 L 846.75 554.878906 L 851.015625 559.375 L 847.636719 562.933594 L 844.335938 559.457031 L 831.894531 559.457031 L 828.191406 563.355469 L 828.191406 573.824219 L 831.933594 577.765625 L 844.414062 577.765625 L 847.675781 574.332031 L 850.976562 577.851562 L 846.75 582.34375 L 839.984375 582.34375 L 839.984375 583.488281 L 843.046875 586.664062 Z M 837.691406 592.300781"/><path fill="#2A4266" d="M 881.371094 547.25 L 876.015625 553.609375 L 871.628906 549.457031 L 868.488281 553.015625 L 865.671875 550.472656 L 871.023438 544.074219 L 875.414062 548.3125 L 878.554688 544.707031 Z M 876.417969 559.457031 L 870.179688 559.457031 L 865.148438 564.671875 L 865.148438 570.222656 L 881.453125 570.222656 L 881.453125 564.710938 Z M 881.453125 582.171875 L 881.453125 574.503906 L 865.148438 574.503906 L 865.148438 582.171875 L 860.515625 582.171875 L 860.515625 562.976562 L 868.085938 554.839844 L 878.554688 554.839844 L 886.121094 562.933594 L 886.121094 582.171875 Z M 881.453125 582.171875"/><path fill="#2A4266" d="M 918.003906 559.414062 L 905.042969 559.414062 L 901.339844 563.355469 L 901.339844 573.824219 L 905.082031 577.765625 L 918.085938 577.765625 L 921.789062 573.910156 L 921.789062 563.398438 Z M 926.660156 575.5625 L 920.179688 582.382812 L 902.988281 582.382812 L 896.507812 575.5625 L 896.507812 561.660156 L 902.988281 554.835938 L 920.179688 554.835938 L 926.660156 561.660156 Z M 926.660156 575.5625"/><path fill="#2A4266" d="M 244.796875 628.449219 L 260.015625 628.449219 L 263.558594 624.675781 L 263.558594 614.292969 L 259.976562 610.480469 L 244.796875 610.480469 Z M 240.128906 605.902344 L 262.269531 605.902344 L 268.589844 612.554688 L 268.589844 626.371094 L 262.269531 633.023438 L 240.128906 633.023438 Z M 240.128906 605.902344"/><path fill="#2A4266" d="M 300.234375 605.902344 L 303.734375 609.632812 L 300.472656 613.0625 L 297.859375 610.351562 L 284.167969 610.351562 L 284.167969 617.046875 L 298.824219 617.046875 L 298.824219 621.792969 L 284.167969 621.792969 L 284.167969 628.574219 L 298.097656 628.574219 L 300.675781 625.90625 L 303.894531 629.292969 L 300.355469 633.023438 L 279.578125 633.023438 L 279.578125 605.902344 Z M 300.234375 605.902344"/><path fill="#2A4266" d="M 332.117188 625.863281 L 334.851562 628.660156 L 345.964844 628.660156 L 346.769531 627.515625 L 329.054688 612.34375 L 333.808594 605.730469 L 348.984375 605.730469 L 352.566406 609.589844 L 349.304688 613.019531 L 346.691406 610.265625 L 336.464844 610.265625 L 335.578125 611.453125 L 353.414062 626.5 L 348.5 633.195312 L 332.601562 633.195312 L 328.855469 629.253906 Z M 332.117188 625.863281"/><path fill="#2A4266" d="M 367.058594 633.023438 L 362.390625 633.023438 L 362.390625 605.902344 L 367.058594 605.902344 Z M 367.058594 633.023438"/><path fill="#2A4266" d="M 377.566406 628.363281 L 391.941406 628.363281 L 392.742188 627.390625 L 376.078125 612.257812 L 380.667969 605.902344 L 397.65625 605.902344 L 397.65625 610.5625 L 383.808594 610.5625 L 383.042969 611.539062 L 399.75 626.625 L 395.039062 633.023438 L 377.566406 633.023438 Z M 377.566406 628.363281"/><path fill="#2A4266" d="M 416.9375 633.023438 L 416.9375 610.476562 L 410.335938 610.476562 L 407.476562 613.488281 L 404.097656 609.925781 L 407.921875 605.902344 L 430.667969 605.902344 L 434.492188 609.925781 L 431.070312 613.488281 L 428.210938 610.476562 L 421.609375 610.476562 L 421.609375 633.023438 Z M 416.9375 633.023438"/><path fill="#2A4266" d="M 463.4375 605.902344 L 463.4375 610.523438 L 446.648438 610.523438 L 446.648438 616.921875 L 461.945312 616.921875 L 461.945312 621.667969 L 446.648438 621.667969 L 446.648438 628.40625 L 463.597656 628.40625 L 463.597656 633.023438 L 442.019531 633.023438 L 442.019531 605.902344 Z M 463.4375 605.902344"/><path fill="#2A4266" d="M 501.84375 633.023438 L 501.84375 613.191406 L 490.289062 626.964844 L 478.695312 613.234375 L 478.695312 633.023438 L 474.144531 633.023438 L 474.144531 607.726562 L 477.285156 604.632812 L 490.328125 619.886719 L 503.332031 604.632812 L 506.511719 607.765625 L 506.511719 633.023438 Z M 501.84375 633.023438"/><path fill="#2A4266" d="M 533.484375 610.308594 L 527.246094 610.308594 L 522.210938 615.519531 L 522.210938 621.074219 L 538.519531 621.074219 L 538.519531 615.5625 Z M 538.519531 633.023438 L 538.519531 625.355469 L 522.210938 625.355469 L 522.210938 633.023438 L 517.582031 633.023438 L 517.582031 613.828125 L 525.152344 605.6875 L 535.617188 605.6875 L 543.1875 613.785156 L 543.1875 633.023438 Z M 538.519531 633.023438"/><path fill="#2A4266" d="M 555.144531 625.863281 L 557.878906 628.660156 L 568.992188 628.660156 L 569.796875 627.515625 L 552.082031 612.34375 L 556.835938 605.730469 L 572.011719 605.730469 L 575.59375 609.589844 L 572.335938 613.019531 L 569.71875 610.265625 L 559.492188 610.265625 L 558.605469 611.453125 L 576.441406 626.5 L 571.527344 633.195312 L 555.628906 633.195312 L 551.882812 629.253906 Z M 555.144531 625.863281"/><path fill="#2A4266" d="M 607.960938 620.058594 L 620.078125 620.058594 L 622.535156 617.46875 L 622.535156 613.105469 L 620.039062 610.480469 L 607.960938 610.480469 Z M 603.292969 633.023438 L 603.292969 605.902344 L 622.171875 605.902344 L 627.367188 611.324219 L 627.367188 619.039062 L 622.171875 624.507812 L 607.960938 624.507812 L 607.960938 633.023438 Z M 603.292969 633.023438"/><path fill="#2A4266" d="M 641.617188 620.097656 L 654.460938 620.097656 L 657.597656 616.835938 L 657.597656 612.851562 L 655.304688 610.480469 L 641.617188 610.480469 Z M 636.90625 633.023438 L 636.90625 605.902344 L 657.398438 605.902344 L 662.472656 611.285156 L 662.472656 618.148438 L 658.648438 622.132812 L 662.351562 625.988281 L 662.351562 633.023438 L 657.558594 633.023438 L 657.558594 627.726562 L 654.539062 624.550781 L 641.617188 624.550781 L 641.617188 633.023438 Z M 636.90625 633.023438"/><path fill="#2A4266" d="M 695.160156 605.902344 L 695.160156 610.523438 L 678.371094 610.523438 L 678.371094 616.921875 L 693.671875 616.921875 L 693.671875 621.667969 L 678.371094 621.667969 L 678.371094 628.40625 L 695.320312 628.40625 L 695.320312 633.023438 L 673.742188 633.023438 L 673.742188 605.902344 Z M 695.160156 605.902344"/><path fill="#2A4266" d="M 710.539062 628.449219 L 725.757812 628.449219 L 729.296875 624.675781 L 729.296875 614.292969 L 725.714844 610.480469 L 710.539062 610.480469 Z M 705.867188 605.902344 L 728.011719 605.902344 L 734.332031 612.554688 L 734.332031 626.371094 L 728.011719 633.023438 L 705.867188 633.023438 Z M 705.867188 605.902344"/><path fill="#2A4266" d="M 749.992188 633.023438 L 745.320312 633.023438 L 745.320312 605.902344 L 749.992188 605.902344 Z M 749.992188 633.023438"/><path fill="#2A4266" d="M 776.964844 610.308594 L 770.722656 610.308594 L 765.691406 615.519531 L 765.691406 621.074219 L 781.996094 621.074219 L 781.996094 615.5625 Z M 781.996094 633.023438 L 781.996094 625.355469 L 765.691406 625.355469 L 765.691406 633.023438 L 761.0625 633.023438 L 761.0625 613.828125 L 768.628906 605.6875 L 779.097656 605.6875 L 786.667969 613.785156 L 786.667969 633.023438 Z M 781.996094 633.023438"/><path fill="#2A4266" d="M 802.40625 633.023438 L 797.734375 633.023438 L 797.734375 605.902344 L 802.40625 605.902344 Z M 802.40625 633.023438"/><path fill="#2A4266" d="M 814.964844 625.863281 L 817.703125 628.660156 L 828.816406 628.660156 L 829.621094 627.515625 L 811.90625 612.34375 L 816.65625 605.730469 L 831.835938 605.730469 L 835.417969 609.589844 L 832.15625 613.019531 L 829.539062 610.265625 L 819.3125 610.265625 L 818.429688 611.453125 L 836.261719 626.5 L 831.351562 633.195312 L 815.449219 633.195312 L 811.707031 629.253906 Z M 814.964844 625.863281"/>`;
+
+// Símbolo aplicado sobre círculo branco, conforme o manual de identidade
+function LogoN({ size = 40, circulo = true }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" aria-label="NORUM">
-      <polygon points="50,4 91,27 91,73 50,96 9,73 9,27" fill={NAVY} stroke="#fff" strokeWidth="4" />
-      <polygon points="50,13 83,31 83,69 50,87 17,69 17,31" fill="none" stroke="#fff" strokeWidth="2.5" opacity="0.55" />
-      <path d="M36 68 V34 L64 68 V34" fill="none" stroke="#fff" strokeWidth="7" strokeLinejoin="round" strokeLinecap="round" />
+      {circulo && <circle cx="50" cy="50" r="50" fill="#FFFFFF" />}
+      <g transform="translate(50 50) scale(0.255) translate(-540 -195)"
+         dangerouslySetInnerHTML={{ __html: LOGO_SIMBOLO }} />
     </svg>
   );
 }
@@ -1227,7 +1266,7 @@ function FormItem({ data, conds, onSave, onClose }) {
   );
 }
 function FormOrcamento({ data, linhasIniciais, conds, onSave, onClose }) {
-  const [f, setF] = useState({ titulo: "", dataEmissao: hoje(), validadeDias: 15, observacoes: "", status: "rascunho", clienteAvulso: "", condId: conds[0]?.id, ...data });
+  const [f, setF] = useState({ titulo: "", dataEmissao: hoje(), validadeDias: 15, observacoes: "", dadosContratante: "", status: "rascunho", clienteAvulso: "", condId: conds[0]?.id, ...data });
   const [linhas, setLinhas] = useState(
     linhasIniciais && linhasIniciais.length
       ? linhasIniciais.map((l) => ({ ...l }))
@@ -1287,6 +1326,11 @@ function FormOrcamento({ data, linhasIniciais, conds, onSave, onClose }) {
       <label>Observações (aparecem no PDF)</label>
       <textarea value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} rows={3}
         placeholder="Ex.: Prazo de execução de 5 dias úteis. Pagamento em até 30 dias."
+        style={{ width: "100%", padding: "10px 12px", border: `1px solid rgba(127,175,232,.20)`, borderRadius: 10, fontSize: 14, background: "rgba(6,22,38,.6)", color: INK, fontFamily: "inherit", resize: "vertical" }} />
+
+      <label>Dados do contratante (aparecem no rodapé do PDF)</label>
+      <textarea value={f.dadosContratante} onChange={(e) => setF({ ...f, dadosContratante: e.target.value })} rows={3}
+        placeholder={"Ex.:\nSolarpreve Empreendimentos\nCNPJ 32.050.508/0001-90"}
         style={{ width: "100%", padding: "10px 12px", border: `1px solid rgba(127,175,232,.20)`, borderRadius: 10, fontSize: 14, background: "rgba(6,22,38,.6)", color: INK, fontFamily: "inherit", resize: "vertical" }} />
 
       <Acoes onSave={() => f.titulo && onSave(f, linhas)} onClose={onClose} />
