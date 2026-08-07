@@ -213,6 +213,14 @@ const orcParaLinha = (o) => ({ condominio_id: nuloSeAvulso(o.condId), cliente_av
 const orcItemDeLinha = (r) => ({ id: r.id, orcId: r.orcamento_id, descricao: r.descricao, quantidade: Number(r.quantidade), valorUnitario: Number(r.valor_unitario), ordem: r.ordem });
 
 async function carregarTudo() {
+  // Tempo limite: em obra com sinal fraco, a espera não pode ser infinita
+  const limite = new Promise((_, rej) =>
+    setTimeout(() => rej(new Error("Sem resposta do servidor. Verifique sua conexão.")), 15000)
+  );
+  return Promise.race([buscarDados(), limite]);
+}
+
+async function buscarDados() {
   const [c, i, s, o, oi] = await Promise.all([
     supabase.from("condominios").select("*").order("nome"),
     supabase.from("itens_monitorados").select("*"),
@@ -284,6 +292,7 @@ export default function App() {
   const [condFiltro, setCondFiltro] = useState("todos");
   const [modal, setModal] = useState(null);
   const [condAberto, setCondAberto] = useState(null);
+  const [menuAberto, setMenuAberto] = useState(false); // menu lateral no celular
   const [usuario, setUsuario] = useState(null);      // nome do usuário logado
   const [saudacao, setSaudacao] = useState(false);   // exibe a saudação de boas-vindas
   const [erroBanco, setErroBanco] = useState("");
@@ -291,7 +300,7 @@ export default function App() {
   // Recarrega tudo do banco
   const recarregar = useCallback(async () => {
     try { setDb(await carregarTudo()); setErroBanco(""); }
-    catch (e) { setErroBanco(e.message || "Falha ao carregar dados."); setDb({ condominios: [], itens: [], servicos: [] }); }
+    catch (e) { setErroBanco(e.message || "Falha ao carregar dados."); }
   }, []);
 
   // Mantém a sessão do Supabase entre recarregamentos da página
@@ -311,7 +320,24 @@ export default function App() {
 
   // Fluxo de entrada: login real -> animação -> saudação -> painel
   if (!usuario) return <TelaLogin onEntrar={aoEntrar} />;
-  if (!db) return <div style={{ padding: 40, fontFamily: "system-ui", color: TITULO }}>Carregando dados…</div>;
+  if (!db) return (
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 28,
+      fontFamily: "'Inter', system-ui, sans-serif", background: BG_BASE, textAlign: "center" }}>
+      <div>
+        <div style={{ display: "inline-block", marginBottom: 18 }}><LogoN size={54} /></div>
+        {erroBanco ? (
+          <>
+            <div style={{ color: TITULO, fontSize: 17, fontWeight: 700 }}>Não foi possível carregar os dados</div>
+            <div style={{ color: MUTED, fontSize: 13.5, margin: "8px 0 18px", maxWidth: 320 }}>{erroBanco}</div>
+            <button className="app-btn btn-primary" style={{ background: "linear-gradient(135deg,#28B6E8,#7FE1FF)", color: "#04121f", border: "none", borderRadius: 12, padding: "11px 22px", fontWeight: 800, cursor: "pointer" }}
+              onClick={() => { setErroBanco(""); recarregar(); }}>Tentar novamente</button>
+          </>
+        ) : (
+          <div style={{ color: TITULO, fontSize: 15 }}>Carregando dados…</div>
+        )}
+      </div>
+    </div>
+  );
 
   const condById = (id) => id === AVULSO ? { id: AVULSO, nome: "Avulso / sem condomínio" } : db.condominios.find((c) => c.id === id);
   const opcoesCliente = [...db.condominios, { id: AVULSO, nome: "Avulso / sem condomínio" }];
@@ -483,9 +509,43 @@ export default function App() {
           transition: transform .18s ease, box-shadow .25s ease; }
         .cond-card:hover { transform: translateY(-4px); box-shadow: 0 18px 38px rgba(0,0,0,.45); }
         .cond-card:active { transform: translateY(-1px) scale(.995); }
+
+        /* ----- Botão de menu e overlay (só aparecem no celular) ----- */
+        .btn-menu { display:none; background:rgba(127,175,232,.12); color:#dce9fb; border:none;
+          border-radius:10px; width:42px; height:42px; font-size:19px; cursor:pointer; flex-shrink:0; }
+        .overlay-menu { display:none; position:fixed; inset:0; background:rgba(3,12,22,.6);
+          backdrop-filter:blur(2px); z-index:40; }
+
+        /* ----- Adaptação para telas pequenas (celular) ----- */
+        @media (max-width: 860px) {
+          .barra-lateral { position:fixed !important; left:0; top:0; z-index:45;
+            transform:translateX(-100%); transition:transform .25s ease; box-shadow:0 0 40px rgba(0,0,0,.5); }
+          .barra-lateral.aberta { transform:translateX(0); }
+          .overlay-menu { display:block; }
+          .btn-menu { display:block; }
+          .topo-app { padding:14px 16px !important; gap:12px !important; flex-wrap:wrap; }
+          .topo-app h1 { font-size:17px !important; }
+          .subtitulo { display:none; }
+          .filtro-cond { width:100% !important; margin-left:0 !important; order:3; }
+          main { padding:16px !important; }
+          /* tabelas rolam na horizontal em vez de espremer */
+          .glass { border-radius:14px; }
+          .glass table { min-width:660px; }
+          .glass { overflow-x:auto !important; -webkit-overflow-scrolling:touch; }
+          th, td { padding:10px 10px !important; font-size:13px !important; }
+          .app-btn { padding:9px 12px; font-size:12.5px; }
+        }
+        @media (max-width: 560px) {
+          .kpis { grid-template-columns:1fr 1fr !important; gap:10px !important; }
+          .kpis .valor { font-size:22px !important; }
+        }
       `}</style>
 
-      <aside style={{ width: 258, flexShrink: 0, background: `linear-gradient(180deg, ${NAVY_DK}, #071b33)`, color: "#fff",
+      {/* fundo escurecido ao abrir o menu no celular */}
+      {menuAberto && <div className="overlay-menu" onClick={() => setMenuAberto(false)} />}
+
+      <aside className={`barra-lateral ${menuAberto ? "aberta" : ""}`}
+        style={{ width: 258, flexShrink: 0, background: `linear-gradient(180deg, ${NAVY_DK}, #071b33)`, color: "#fff",
         padding: "22px 16px", display: "flex", flexDirection: "column", gap: 6, position: "sticky", top: 0, height: "100vh" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "4px 6px 18px" }}>
           <LogoN size={44} />
@@ -495,7 +555,7 @@ export default function App() {
           </div>
         </div>
         {NAV.map((n) => (
-          <button key={n.k} className={`nav-item ${aba === n.k ? "active" : ""}`} onClick={() => setAba(n.k)}>
+          <button key={n.k} className={`nav-item ${aba === n.k ? "active" : ""}`} onClick={() => { setAba(n.k); setMenuAberto(false); }}>
             <span className="nav-ico">{n.icon}</span>{n.label}
             {n.k === "painel" && alertas.length > 0 && (
               <span style={{ marginLeft: "auto", background: VERMELHO, borderRadius: 999, fontSize: 11, fontWeight: 800, padding: "1px 8px", animation: "pulseDot 1.6s infinite" }}>{alertas.length}</span>
@@ -509,12 +569,13 @@ export default function App() {
       </aside>
 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <header style={{ padding: "18px 28px", display: "flex", alignItems: "center", gap: 16, borderBottom: `1px solid ${LINE}` }}>
-          <div>
+        <header className="topo-app" style={{ padding: "18px 28px", display: "flex", alignItems: "center", gap: 16, borderBottom: `1px solid ${LINE}` }}>
+          <button className="btn-menu" onClick={() => setMenuAberto(true)} aria-label="Abrir menu">☰</button>
+          <div style={{ minWidth: 0 }}>
             <h1 style={{ margin: 0, fontSize: 21, color: TITULO }}>{NAV.find((n) => n.k === aba)?.label}</h1>
-            <div style={{ fontSize: 12.5, color: MUTED }}>Gestão de condomínios · manutenção predial</div>
+            <div className="subtitulo" style={{ fontSize: 12.5, color: MUTED }}>Gestão de condomínios · manutenção predial</div>
           </div>
-          <select value={condFiltro} onChange={(e) => setCondFiltro(e.target.value)} style={{ marginLeft: "auto", width: 250 }}>
+          <select className="filtro-cond" value={condFiltro} onChange={(e) => setCondFiltro(e.target.value)} style={{ marginLeft: "auto", width: 250 }}>
             <option value="todos">Todos os condomínios</option>
             {db.condominios.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
@@ -523,7 +584,7 @@ export default function App() {
         <main style={{ padding: 28, flex: 1 }}>
           {aba === "painel" && (
             <div className="fade">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 18, marginBottom: 24 }}>
+              <div className="kpis" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 18, marginBottom: 24 }}>
                 <KPI titulo="Itens em alerta" valor={alertas.length} cor={VERMELHO} sub="vencidos ou a vencer em 30 dias" />
                 <KPI titulo="Valores a receber" valor={brl(aReceber)} cor={AMARELO} sub="notas fiscais emitidas" />
                 <KPI titulo="Valores a faturar" valor={brl(naoEmitido)} cor={LARANJA} sub="serviços sem nota fiscal" />
@@ -623,7 +684,7 @@ export default function App() {
 
           {aba === "financeiro" && (
             <div className="fade">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 18, marginBottom: 22 }}>
+              <div className="kpis" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 18, marginBottom: 22 }}>
                 <KPI titulo="Pgto pendente" valor={brl(pgtoPendente)} cor={VERMELHO} sub={`${executadosNaoPagos} serviço(s) executado(s) sem pgto`} />
                 <KPI titulo="A faturar" valor={brl(naoEmitido)} cor={LARANJA} sub="emissão de nota fiscal pendente" />
                 <KPI titulo="A receber" valor={brl(aReceber)} cor={AMARELO} sub="nota emitida, aguardando pgto" />
@@ -1027,7 +1088,7 @@ function TelaLogin({ onEntrar }) {
   const espiralAtiva = construindo || login.length + senha.length > 0;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter', system-ui, sans-serif",
+    <div className="login-wrap" style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter', system-ui, sans-serif",
       background: "radial-gradient(1200px 700px at 20% -10%, #10345f 0%, transparent 55%), radial-gradient(900px 600px at 110% 20%, #0a2748 0%, transparent 50%), #061626" }}>
       <style>{`
         @keyframes fadeUp { from { opacity:0; transform: translateY(16px);} to { opacity:1; transform:none; } }
@@ -1046,10 +1107,16 @@ function TelaLogin({ onEntrar }) {
         .login-btn:active:not(:disabled) { transform: translateY(0) scale(.99); }
         .login-btn:disabled { opacity:.7; cursor:default; }
         .hud-ring { position:absolute; border:1px solid rgba(127,225,255,.18); border-radius:50%; }
+        @media (max-width: 860px) {
+          .login-wrap { flex-direction:column !important; }
+          .login-visual { flex:none !important; min-height:300px; width:100%; padding:24px !important; }
+          .login-form { max-width:100% !important; width:100%; border-left:none !important;
+            border-top:1px solid rgba(127,225,255,.12); padding:28px 22px 40px !important; }
+        }
       `}</style>
 
       {/* Painel esquerdo — construção + HUD */}
-      <div style={{ flex: 1.2, position: "relative", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: 40, overflow: "hidden",
+      <div className="login-visual" style={{ flex: 1.2, position: "relative", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: 40, overflow: "hidden",
         backgroundImage: "linear-gradient(rgba(127,225,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(127,225,255,.06) 1px, transparent 1px)",
         backgroundSize: "40px 40px", animation: "gridmove 6s linear infinite" }}>
 
@@ -1097,7 +1164,7 @@ function TelaLogin({ onEntrar }) {
       </div>
 
       {/* Painel direito — formulário */}
-      <div style={{ flex: 1, maxWidth: 460, display: "flex", flexDirection: "column", justifyContent: "center", padding: "48px 52px",
+      <div className="login-form" style={{ flex: 1, maxWidth: 460, display: "flex", flexDirection: "column", justifyContent: "center", padding: "48px 52px",
         background: "rgba(4,14,26,.55)", backdropFilter: "blur(12px)", borderLeft: "1px solid rgba(127,225,255,.12)" }}>
         <div className="login-in">
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 30 }}>
@@ -1166,7 +1233,7 @@ function KPI({ titulo, valor, cor, sub }) {
     <div className="glass fade" style={{ padding: 20, position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: 0, left: 0, width: 4, height: "100%", background: cor }} />
       <div style={{ fontSize: 12, color: MUTED, fontWeight: 700 }}>{titulo}</div>
-      <div style={{ fontSize: 30, fontWeight: 800, color: cor, margin: "6px 0" }}>{valor}</div>
+      <div className="valor" style={{ fontSize: 30, fontWeight: 800, color: cor, margin: "6px 0" }}>{valor}</div>
       <div style={{ fontSize: 12, color: MUTED }}>{sub}</div>
     </div>
   );
