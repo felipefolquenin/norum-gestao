@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase, supabaseConfigurado } from "./supabase.js";
 
 // ============================================================================
@@ -238,6 +238,66 @@ async function buscarDados() {
     orcamentos: o.error ? [] : (o.data || []).map(orcDeLinha),
     orcItens: oi.error ? [] : (oi.data || []).map(orcItemDeLinha),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Seletor com busca — substitui a lista suspensa comum quando há muitos
+// condomínios. Digite parte do nome para filtrar (ignora acentos e maiúsculas).
+// ---------------------------------------------------------------------------
+const semAcento = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+function SeletorBusca({ valor, opcoes, onChange, placeholder = "Selecione", className }) {
+  const [aberto, setAberto] = useState(false);
+  const [busca, setBusca] = useState("");
+  const caixa = useRef(null);
+  const campo = useRef(null);
+
+  const selecionado = opcoes.find((o) => o.id === valor);
+  const alvo = semAcento(busca.trim());
+  const filtradas = alvo ? opcoes.filter((o) => semAcento(o.nome).includes(alvo)) : opcoes;
+
+  useEffect(() => {
+    if (!aberto) return;
+    const fora = (e) => { if (caixa.current && !caixa.current.contains(e.target)) { setAberto(false); setBusca(""); } };
+    document.addEventListener("mousedown", fora);
+    document.addEventListener("touchstart", fora);
+    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("touchstart", fora); };
+  }, [aberto]);
+
+  useEffect(() => { if (aberto && campo.current) campo.current.focus(); }, [aberto]);
+
+  const escolher = (id) => { onChange(id); setAberto(false); setBusca(""); };
+
+  return (
+    <div ref={caixa} className={className} style={{ position: "relative" }}>
+      <button type="button" onClick={() => setAberto(!aberto)} className="sel-botao">
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {selecionado ? selecionado.nome : placeholder}
+        </span>
+        <span style={{ opacity: .6, marginLeft: 8, flexShrink: 0 }}>▾</span>
+      </button>
+
+      {aberto && (
+        <div className="sel-lista">
+          <input ref={campo} className="sel-busca" value={busca} placeholder="Pesquisar…"
+            onChange={(e) => setBusca(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { setAberto(false); setBusca(""); }
+              if (e.key === "Enter" && filtradas.length) { e.preventDefault(); escolher(filtradas[0].id); }
+            }} />
+          <div style={{ maxHeight: 240, overflowY: "auto" }}>
+            {filtradas.map((o) => (
+              <button key={o.id} type="button" onClick={() => escolher(o.id)}
+                className={`sel-item ${o.id === valor ? "ativo" : ""}`}>{o.nome}</button>
+            ))}
+            {filtradas.length === 0 && (
+              <div style={{ padding: "12px 14px", color: MUTED, fontSize: 13 }}>Nenhum resultado para “{busca}”.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Badge({ children, cor }) {
@@ -510,6 +570,24 @@ export default function App() {
         .cond-card:hover { transform: translateY(-4px); box-shadow: 0 18px 38px rgba(0,0,0,.45); }
         .cond-card:active { transform: translateY(-1px) scale(.995); }
 
+        /* ----- Seletor com busca ----- */
+        .filtro-cond { margin-left:auto; width:250px; flex-shrink:0; }
+        .sel-botao { width:100%; display:flex; align-items:center; justify-content:space-between;
+          padding:10px 12px; border:1px solid rgba(127,175,232,.20); border-radius:10px; font-size:14px;
+          background:rgba(6,22,38,.6); color:${INK}; cursor:pointer; text-align:left; font-family:inherit; }
+        .sel-botao:hover { border-color:rgba(40,182,232,.5); }
+        .sel-lista { position:absolute; z-index:60; top:calc(100% + 6px); left:0; right:0;
+          background:${CARD_SOLID}; border:1px solid rgba(127,175,232,.22); border-radius:12px;
+          box-shadow:0 16px 40px rgba(0,0,0,.55); overflow:hidden; }
+        .sel-busca { width:100%; border:none; border-bottom:1px solid rgba(127,175,232,.16) !important;
+          border-radius:0 !important; background:rgba(6,22,38,.5) !important; padding:11px 13px !important; }
+        .sel-busca:focus { box-shadow:none !important; border-color:rgba(127,175,232,.16) !important; }
+        .sel-item { display:block; width:100%; text-align:left; border:none; background:transparent;
+          color:${INK}; padding:10px 13px; font-size:13.5px; cursor:pointer; font-family:inherit;
+          border-bottom:1px solid rgba(127,175,232,.07); }
+        .sel-item:hover { background:rgba(40,182,232,.16); }
+        .sel-item.ativo { background:rgba(40,182,232,.22); font-weight:700; color:#fff; }
+
         /* ----- Botão de menu e overlay (só aparecem no celular) ----- */
         .btn-menu { display:none; background:rgba(127,175,232,.12); color:#dce9fb; border:none;
           border-radius:10px; width:42px; height:42px; font-size:19px; cursor:pointer; flex-shrink:0; }
@@ -575,10 +653,8 @@ export default function App() {
             <h1 style={{ margin: 0, fontSize: 21, color: TITULO }}>{NAV.find((n) => n.k === aba)?.label}</h1>
             <div className="subtitulo" style={{ fontSize: 12.5, color: MUTED }}>Gestão de condomínios · manutenção predial</div>
           </div>
-          <select className="filtro-cond" value={condFiltro} onChange={(e) => setCondFiltro(e.target.value)} style={{ marginLeft: "auto", width: 250 }}>
-            <option value="todos">Todos os condomínios</option>
-            {db.condominios.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-          </select>
+          <SeletorBusca className="filtro-cond" valor={condFiltro} onChange={setCondFiltro}
+            opcoes={[{ id: "todos", nome: "Todos os condomínios" }, ...db.condominios]} />
         </header>
 
         <main style={{ padding: 28, flex: 1 }}>
@@ -1316,7 +1392,7 @@ function FormItem({ data, conds, onSave, onClose }) {
   return (
     <Modal titulo={data.id ? "Editar registro" : "Cadastrar registro"} onClose={onClose}>
       <label>Cliente</label>
-      <select value={f.condId} onChange={(e) => setF({ ...f, condId: e.target.value })}>{conds.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
+      <SeletorBusca valor={f.condId} opcoes={conds} onChange={(v) => setF({ ...f, condId: v })} placeholder="Escolha o condomínio" />
       {ehAvulso && (
         <>
           <label>Nome do cliente (avulso)</label>
@@ -1349,7 +1425,7 @@ function FormOrcamento({ data, linhasIniciais, conds, onSave, onClose }) {
   return (
     <Modal titulo={data.id ? `Editar orçamento ORC-${String(data.numero).padStart(4, "0")}` : "Novo orçamento"} onClose={onClose} largura={620}>
       <label>Cliente</label>
-      <select value={f.condId} onChange={(e) => setF({ ...f, condId: e.target.value })}>{conds.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
+      <SeletorBusca valor={f.condId} opcoes={conds} onChange={(v) => setF({ ...f, condId: v })} placeholder="Escolha o condomínio" />
       {ehAvulso && (
         <>
           <label>Nome do cliente (avulso)</label>
@@ -1438,7 +1514,7 @@ function FormServico({ data, conds, onSave, onClose }) {
   return (
     <Modal titulo={data.id ? "Editar serviço" : "Cadastrar serviço"} onClose={onClose}>
       <label>Cliente</label>
-      <select value={f.condId} onChange={(e) => setF({ ...f, condId: e.target.value })}>{conds.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>
+      <SeletorBusca valor={f.condId} opcoes={conds} onChange={(v) => setF({ ...f, condId: v })} placeholder="Escolha o condomínio" />
       {ehAvulso && (
         <>
           <label>Nome do cliente (avulso)</label>
