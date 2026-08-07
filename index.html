@@ -2,15 +2,34 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>NORUM Engenharia · Gestão Predial</title>
+
+    <!-- App instalável (PWA) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0C2340" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="NORUM" />
+    <meta name="description" content="Sistema de gestão de condomínios e manutenção predial da NORUM Engenharia" />
+
     <style>
       html, body, #root { margin: 0; height: 100%; background: #061626; }
-      body { font-family: 'Inter', system-ui, sans-serif; }
+      body { font-family: 'Inter', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
     </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Registra o service worker (necessário para instalar o app no celular)
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("/sw.js").catch(function () {});
+        });
+      }
+    </script>
   </body>
 </html>
