@@ -12,5 +12,10 @@ if (!url || !anon) {
   );
 }
 
-export const supabase = createClient(url || "", anon || "");
+// Se as chaves não estiverem definidas, usamos valores de reserva apenas para
+// o app não quebrar com tela branca — a interface avisa que falta configurar.
+export const supabase = createClient(
+  url || "https://indefinido.supabase.co",
+  anon || "indefinido"
+);
 export const supabaseConfigurado = Boolean(url && anon);
